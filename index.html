@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate Invoice PDF</title>
+    <style>
+        body {
+            background-color: #2c2c2c;
+            color: #f4e99b;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #ffd700;
+        }
+        form {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            background-color: #333;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        select, input, textarea, button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid #555;
+            border-radius: 4px;
+            background-color: #444;
+            color: #f4e99b;
+        }
+        select::placeholder, input::placeholder, textarea::placeholder {
+            color: #d4c77b;
+        }
+        button {
+            background-color: #ffd700;
+            color: #2c2c2c;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #e5c700;
+        }
+    </style>
+</head>
+<body>
+    <h1>Generate Invoice PDF</h1>
+    <form id="pdfForm">
+        <label for="templateName">Template Name:</label>
+        <select id="templateName" name="templateName" required>
+            <option value="">Loading templates...</option>
+        </select>
+
+        <label for="invoiceNumber">Invoice #:</label>
+        <input type="text" id="invoiceNumber" name="invoiceNumber" required>
+        
+        <label for="invoiceDate">Invoice Date:</label>
+        <input type="date" id="invoiceDate" name="invoiceDate" required>
+        
+        <label for="billTo">Bill To:</label>
+        <input type="text" id="billTo" name="billTo" required>
+        
+        <label for="items">Items:</label>
+        <div id="itemsContainer">
+            <div class="item">
+                <label>Description:</label>
+                <input type="text" name="description" required>
+                <label>Amount:</label>
+                <input type="number" name="amount" required>
+                <label>VAT:</label>
+                <input type="number" name="vat" required>
+            </div>
+        </div>
+        
+        <label for="invoiceTotal">Invoice Total:</label>
+        <input type="number" id="invoiceTotal" name="invoiceTotal" required>
+        
+        <label for="trcAddress">TRC-20 Address:</label>
+        <input type="text" id="trcAddress" name="trcAddress" required>
+        
+        <label for="termsConditions">Terms & Conditions:</label>
+        <textarea id="termsConditions" name="termsConditions" rows="5" required></textarea>
+        
+        <button type="button" onclick="generatePDF()">Generate PDF</button>
+    </form>
+
+    <script>
+        async function fetchTemplates() {
+            try {
+                const response = await fetch('http://localhost:8000/templates');
+                const data = await response.json();
+                const templateSelect = document.getElementById('templateName');
+                templateSelect.innerHTML = '';  // Clear loading option
+                data.templates.forEach(template => {
+                    const option = document.createElement('option');
+                    option.value = template.name;
+                    option.textContent = template.name;
+                    templateSelect.appendChild(option);
+                });
+            } catch (error) {
+                alert('Failed to load templates. Please try again.');
+            }
+        }
+        async function generatePDF() {
+            const formData = {
+                template_name: document.getElementById('templateName').value,
+                json_data: JSON.stringify({
+                    invoice_number: document.getElementById('invoiceNumber').value,
+                    invoice_date: document.getElementById('invoiceDate').value,
+                    bill_to: document.getElementById('billTo').value,
+                    items: Array.from(document.querySelectorAll('#itemsContainer .item')).map(item => ({
+                        description: item.querySelector('[name="description"]').value,
+                        amount: item.querySelector('[name="amount"]').value,
+                        vat: item.querySelector('[name="vat"]').value
+                    })),
+                    invoice_total: document.getElementById('invoiceTotal').value,
+                    trc_address: document.getElementById('trcAddress').value,
+                    terms_conditions: document.getElementById('termsConditions').value
+                })
+            };
+
+            const response = await fetch('http://localhost:8000/generate-pdf', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'generated_invoice.pdf';
+                a.click();
+                window.URL.revokeObjectURL(url);
+            } else {
+                const error = await response.json();
+                alert(`Error: ${error.detail}`);
+            }
+        }
+
+    fetchTemplates();
+    </script>
+</body>
+</html>
